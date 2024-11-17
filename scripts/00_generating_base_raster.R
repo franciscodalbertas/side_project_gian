@@ -28,6 +28,10 @@ world_vect <- vect(world_moll)
 country_raster <- rasterize(world_vect, r, field = "ID")
 plot(country_raster)
 
+# create dir to store rasters
+
+dir.create("rasters/")
+
 # Save the raster with LZW compression
 writeRaster(country_raster, "rasters/world_base_moll_1km.tif", 
             filetype = "GTiff", 
