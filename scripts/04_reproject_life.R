@@ -20,5 +20,12 @@ plot(LIFE)
 # Reproject LIFE to match the resolution and CRS of base raster
 LIFE_r<- project(LIFE, base_raster)
 
-#2
+#save output ####
+
+# Define the output file path
+output_path <- "rasters/LIFE_moll_1km.tif"
+
+# Save the reprojected raster
+writeRaster(LIFE_r, output_path, overwrite = TRUE)
+
 
