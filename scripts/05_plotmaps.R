@@ -17,51 +17,46 @@ plot(natR_mosaic)
 
 #Filter rasters by conditions #### 
 
-#take lowest 30% of oppcost  
+#take lowest 30% and highest 30% of oppcost  
 oppcost_lowest30 <- ifel(oppcost <= quantile(values(oppcost), 0.3, na.rm = TRUE), 
+                         oppcost, NA)
+oppcost_highest30 <- ifel(oppcost <= quantile(values(oppcost), 0.7, na.rm = TRUE), 
                          oppcost, NA)
 plot(oppcost)
 plot(oppcost_lowest30)
+plot(oppcost_highest30)
 
-#take the top 30% values of LIFE 
+#take the top 30% and bottom 30% values of LIFE 
 life_combined <- subset(life, "score") #take life combined across taxa
 life_top30 <- ifel(life_combined <= quantile(values(life_combined), 0.7, na.rm = TRUE), life_combined, NA)
+life_bottom30 <- ifel(life_combined <= quantile(values(life_combined), 0.3, na.rm = TRUE), life_combined, NA)
 
 plot(life_combined)
 plot(life_top30)
+plot(life_bottom30)
 
-#take areas that are of higher than average (>=50) likihood to naturally regenerate 
+#take areas that are of higher  (>=50) and lower (<50) than average likihood to naturally regenerate 
 natR_top50 <- ifel(natR_mosaic >= 50, natR_mosaic, NA)
+natR_bottom50 <- ifel(natR_mosaic < 50, natR_mosaic, NA)
 
 plot(natR_mosaic)
 plot(natR_top50)
+plot(natR_bottom50)
 
-#save environment so don't need to recompute intermediate rasters 
-save.image(file = "my_environment.RData")
+#Create combined outputs ####
 
-# Create a binary combined mask where no NA values exist in any raster
-combined_mask <- !(is.na(natR_top50) | is.na(oppcost_lowest30) | is.na(life_top30))
-plot(combined_mask)
+#low oppcost, high biod, high regen - these are good places to restore 
+combined_mask1 <- !(is.na(natR_top50) | is.na(oppcost_lowest30) | is.na(life_top30))
 
-#Or we can plot only the areas of high Nat regen that also have high biod and low opcost
-highRegen_lifetop30_oppcostbottom30<- mask(natR_top50, combined_mask)
-plot(highRegen_lifetop30_oppcostbottom30)
+#high oppcost, low biod, high regen - places where nat regen has high leakage and lower relative biod benefits 
+combined_mask2 <-!(is.na(natR_top50) | is.na(oppcost_highest30) | is.na(life_bottom30))
 
-#make nice plot ####
+#high biod, low oppcost, low regen - #places where biodiversity benefits are high and oppcost low - but we may need active restoration approaches as regen potential is lower 
+combined_mask3 <-!(is.na(natR_bottom50) | is.na(oppcost_bottom30) | is.na(life_top30))
 
-# Step 1: Plot the natural regeneration potential (base layer) with light green color
-# We use a lighter green color scheme for the regeneration potential
-plot(natR_mosaic, 
-     main = "Total Area for Ecological Restoration", 
-     col = terrain.colors(100),  # Choose a suitable color palette
-     legend = TRUE,  # Add a legend
-     axes = TRUE,  # Show axes
-     box = TRUE,  # Show the plot box
-     cex.main = 1.5,  # Title size
-     cex.axis = 1.2)  # Axis label size
 
-# Step 2: Add the mask (result raster) in dark green with transparency on top
-# We plot the combined mask using a dark green color with some transparency
-plot(combined_mask, 
-     col = rgb(0, 0.5, 0, 0.6),  # Dark green with transparency (alpha = 0.6)
-     add = TRUE)  # Add this plot on top of the previous one
+#EXPORT RESULTS 
+writeRaster(combined_mask, "outputs/high50Regen_lifetop30_oppcostbottom30.tif" )
+writeRaster(combined_mask2, "outputs/high50Regen_lifebottom30_oppcosthighest30.tif" )
+writeRaster(combined_mask3, "outputs/bottom50Regen_lifetop30_oppcostbottom30.tif" )
+
