@@ -14,16 +14,17 @@ LIFE_path <- "rasters/deltap_final/deltap_final/" #old version
 
 LIFE <- rast(paste0(LIFE_path, "summed_scaled_restore_0.25.tif"))
 
-#sum value for amphibians, birds, mammals and reptiles to get LIFE score 
-#across taxa 
-plot(LIFE)
+# Ensure LIFE matches the extent of base_raster by cropping it
+#LIFE_cropped <- crop(LIFE, ext(base_raster))
 
-# Reproject LIFE to match the resolution and CRS of base raster
-LIFE_r<- project(LIFE, base_raster)
+# Reproject LIFE to match base_raster's CRS, extent, and resolution
+LIFE_r <- project(LIFE_cropped, base_raster, method = "bilinear") 
 
-#save output ####
+# Check the output
+print(LIFE_r)
+plot(LIFE_r)
 
-# Define the output file path
+# Save the reprojected raster if needed
 output_path <- "rasters/LIFE_moll_1km.tif"
 
 # Save the reprojected raster

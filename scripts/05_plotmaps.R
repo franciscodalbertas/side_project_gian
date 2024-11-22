@@ -3,7 +3,7 @@
 library(terra)
 library(ggplot2)
 library(viridis)  
-
+library(tidyverse)
 #read in dependencies #### 
 
 oppcost <- rast("rasters/nat_regeneration_cost_mollweide_1km.tif")
@@ -14,6 +14,16 @@ natR_mosaic <- rast("rasters/mosaic_nat_reg_mollweide_1km.tif")
 plot(oppcost)
 plot(life)
 plot(natR_mosaic)
+
+# Stack the rasters
+r_stack <- c(oppcost, life, natR_mosaic)  # Combine the rasters into a SpatRaster
+
+# Assign names to layers
+names(r_stack) <- c("oppcost", "life","natRegen")
+
+# Convert to a tidy dataframe - RUN TOMORROW ON MY DESKTOP 
+tidy_df <- as.data.frame(r_stack, xy = TRUE) %>%
+  rename(X = x, Y = y)
 
 #Filter rasters by conditions #### 
 
@@ -52,7 +62,7 @@ combined_mask1 <- !(is.na(natR_top50) | is.na(oppcost_lowest30) | is.na(life_top
 combined_mask2 <-!(is.na(natR_top50) | is.na(oppcost_highest30) | is.na(life_bottom30))
 
 #high biod, low oppcost, low regen - #places where biodiversity benefits are high and oppcost low - but we may need active restoration approaches as regen potential is lower 
-combined_mask3 <-!(is.na(natR_bottom50) | is.na(oppcost_bottom30) | is.na(life_top30))
+combined_mask3 <-!(is.na(natR_bottom50) | is.na(oppcost_lowest30) | is.na(life_top30))
 
 
 #EXPORT RESULTS 
