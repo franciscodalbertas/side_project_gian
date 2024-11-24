@@ -24,11 +24,11 @@ df <- cbind(df, values_df)
 
 # clean NAs
 
-df <- df %>%
+df2 <- df %>%
   filter(!is.na(cost),
-         #!is.na(prob_reg)
+         !is.na(prob_reg)
          )
+
 # save table
 
-saveRDS(df,"output_tables/raster_values.rds")
-head(df)
+saveRDS(df2,"output_tables/raster_values.rds")
