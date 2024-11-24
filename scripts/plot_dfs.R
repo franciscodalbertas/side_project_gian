@@ -9,6 +9,7 @@ lowest_30_oc <- quantile(df$cost, 0.3, na.rm = TRUE)
 highest_30_oc <- quantile(df$cost, 0.7, na.rm = TRUE)
 
 #take the top 30% and bottom 30% values of LIFE
+# multiplying by zero because negative values are better
 life_top30 <- quantile(df$life_val*-1, 0.7, na.rm = TRUE)
 
 life_bottom30 <- quantile(df$life_val*-1, 0.3, na.rm = TRUE)
@@ -25,6 +26,11 @@ combined_mask1 <- df %>%
          life_val>=life_top30)
 
 # !!!!!!!!!! 2 pixels??
+#high oppcost, low biod, high regen - places where nat regen has high leakage and lower relative biod benefits 
+combined_mask2 <- df %>%
+  filter(prob_reg>=50,
+         cost >= highest_30_oc,
+         life_val>=life_bottom30)
 
 # this would define the pixels under those conditions
 # we can add country ID or anything we want! than aggregate by country (or not to get the values)
@@ -33,7 +39,7 @@ combined_mask1 <- df %>%
 # ex of how to plot:
 
 # Plot as a map
-ggplot(combined_mask1, aes(x = x, y = y, fill = prob_reg)) +
+ggplot(df, aes(x = x, y = y, fill = cost)) +
   geom_raster() + # Use geom_raster() for a faster alternative
   scale_fill_viridis_c() + # A color scale suitable for continuous values
   coord_equal() + # Ensures square tiles for a proper map
