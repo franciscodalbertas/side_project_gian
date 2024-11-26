@@ -31,8 +31,10 @@ prob_rasters <- grep(pattern = "pnv_pct",x = download_links,value = T)
 #   download.file(file_urls[i], destfile = file_names[i], mode = "wb")
 # }
 
-# Load the base world raster
-base_raster <- rast("rasters/world_base_moll_1km.tif")
+# Load the base world raster (replace by the reg cost in degrees)
+#base_raster <- rast("rasters/world_base_moll_1km.tif")
+base_raster <- rast("rasters/nat_regeneration_cost_latlong_1km.tif")
+base_raster <- base_raster/base_raster
 
 # Get the file into memory as raw data
   for(i in seq_along(prob_rasters)){
@@ -54,7 +56,7 @@ base_raster <- rast("rasters/world_base_moll_1km.tif")
   # save with the name of the tile and then its only a matter of mosaicing!
   nm2save <- str_extract(prob_rasters[i], "pnv.*?\\.tif")
   # Save the raster with LZW compression
-  writeRaster(raster_to_resample_reprojected, paste0("rasters/nat_reg/1km_mollweide_",nm2save), 
+  writeRaster(raster_to_resample_reprojected, paste0("rasters/nat_reg_latlong/1km_latlong_",nm2save), 
               filetype = "GTiff", 
               datatype = "INT1U", # Suitable for integer data like IDs or binary values
               gdal = c("COMPRESS=LZW"),
