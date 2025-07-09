@@ -6,39 +6,18 @@ library(terra)
 #-------------------------------------------------------------------------------
 # source:
 # https://zenodo.org/records/11372275
-# maybe keep this as reference!
 # folder
-
-f <- "../../Data/Busch_et_al_24/"
-
-imp_costs <- rast(paste0(f,"03_implementation_cost.tif"))
+opp_cost <- rast("rasters/02_opportunity_cost.tif")
+plot(opp_cost)
 
 # adjust resol and proj
 # read base raster
-base <- rast("rasters/world_base_moll_1km.tif")
-rstr_nm <- c("nat_regeneration_cost","native_spp_plantation_cost")
+base_raster <- rast("rasters/nat_regeneration_cost_latlong_1km.tif")
 
-for(i in 1:2){
-  r <- imp_costs[[i]]
-  #r2 <- project(imp_costs[[i]],base)
-  # writeRaster(r2, paste0("rasters/",rstr_nm[i],"_mollweide_1km.tif"), 
-  #             filetype = "GTiff", 
-  #             datatype = "INT4S", # Suitable for signed integer data 
-  #             gdal = c("COMPRESS=LZW"),
-  #             overwrite =T)
-  writeRaster(r, paste0("rasters/",rstr_nm[i],"_latlong_1km.tif"),
-              filetype = "GTiff",
-              datatype = "INT4S", # Suitable for signed integer data
-              gdal = c("COMPRESS=LZW"),
-              overwrite =T)
-     
-  
-}
+# Reproject oppcost to match the resolution and CRS of base raster
+opp_cost_r <- project(base_raster, base_raster,"bilinear")
 
-r1 <- rast("rasters/nat_regeneration_cost_latlong_1km.tif")
-r2 <- rast("rasters/native_spp_plantation_cost_mollweide_1km.tif")
-# plot(r1)
-# plot(r2)
-# 
-# print(crs(base))
-# print(ext(base))
+
+# Save the reprojected raster
+writeRaster(opp_cost_r, "rasters/opp_cost_reprojected.tif", overwrite = TRUE)
+
