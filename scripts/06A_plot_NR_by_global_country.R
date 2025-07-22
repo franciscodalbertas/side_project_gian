@@ -4,6 +4,9 @@ library(terra)
 library(tidyverse)
 library(countrycode)
 library(naniar)
+library(dplyr)
+library(ggpubr)
+
 
 #read in table of values
 df <- readRDS("output_tables/full_dataframe_carb_bio_opp_regen.rds")
@@ -35,6 +38,18 @@ df_global <- df %>%
     biodiversity_decile =  ntile(biodiversity, 10), 
     oppcost_decile = ntile(opp_cost, 10)
   )
+
+# check NAs
+
+df_nas <- filter(df_global, is.na(country_name))
+# why so many values without any country attributed?
+#export to shape to check
+df_nas_shp <- sf::st_as_sf(df_nas, coords = c("x", "y"), crs = 4326)
+
+sf::st_write(df_nas_shp, "output_tables/df_nas_country_name.shp")
+
+# its pixels on the edges!! I can filter them out!
+
 #Note - quantile of 10 for carbon = most carbon 
 #       quantile of 10 for biodiversity = worse = fewer extinctions averted 
 df_global %>% filter(biodiversity == min(biodiversity, na.rm = TRUE))
@@ -55,18 +70,25 @@ df_global <- df_global %>% mutate(
 #calculate the total area of restoration potential by country 
 # NB tot_restor is showing the total area, rather than the total of priority areas (which changes by metric)
 
+summary(df_global$area_restorable)# this is fraction...of 3.419187 km2
+
+
+#calculate total restorable area by country
 tot_restor <- df_global %>% select(country_name,area_restorable) %>% 
   group_by(country_name) %>% 
-  summarise(country_restorable_area_km = sum(area_restorable))
+  # calculate area in km2
+  #summarise(country_restorable_area_km = sum(area_restorable))
+  summarise(country_restorable_area_km = sum(area_restorable*3.419187, na.rm = TRUE))
 
 #biodiversity plot
 top30_biod <- df_global %>% filter(biodiversity_decile <= 3) %>%  
   group_by(country_name, regen_05) %>%  
-  #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable)) %>% 
+  #calculate amount of "priority areas (Chico: for 0 and 1 regen)
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable*3.419187)) %>% 
   ungroup() %>%
   group_by(country_name) %>% 
-  #calculate amount of "priority areas' by regeneration potential
+  #calculate amount of "priority areas' by regeneration potential (chico: this is
+  # total restorable area for each country)
   mutate(total_priority_area = sum(priority_restorable_area_by_regen_km)) %>%  
   #add total restorable area
    left_join(tot_restor)
@@ -77,7 +99,7 @@ head(top30_biod)
 top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%  
   group_by(country_name, regen_05) %>%  
   #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable)) %>% 
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable*3.419187)) %>% 
   ungroup() %>%
   group_by(country_name) %>%
   #calculate amount of "priority areas' by regeneration potential
@@ -89,13 +111,15 @@ top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%
 bottom_30_oppcost <- df_global %>% filter(oppcost_decile <= 3) %>%  
   group_by(country_name, regen_05) %>% 
   #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable)) %>% 
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable*3.419187)) %>% 
   ungroup() %>%
   group_by(country_name) %>%
   #calculate amount of "priority areas' by regeneration potential
   mutate(total_priority_area = sum(priority_restorable_area_by_regen_km))%>%  
   #add total restorable area
-  left_join(tot_restor)
+  left_join(tot_restor)%>%
+  #filter out nas
+  filter(!is.na(country_name))
 
 
 
@@ -120,8 +144,10 @@ make_priority_plot <- function(df) {
     filter(country_name %in% top_countries) %>%
     mutate(
       regen_label = if_else(regen_05 == 1, "High regeneration potential", "Low regeneration potential"),
-      country_name = factor(country_name, levels = rev(top_countries)) # Order by descending area
-    )
+      country_name = factor(country_name, levels = rev(top_countries)), # Order by descending area
+      country_restorable_area_km = country_restorable_area_km/10^6,
+      priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km/10^6
+      )
   
   # Plot
   ggplot() +
@@ -150,8 +176,8 @@ make_priority_plot <- function(df) {
         "High regeneration potential" = "#009E73"
       )
     ) +
-    scale_x_continuous(name = "Restorable area (km²)", labels = function(x) format(x, scientific = FALSE)) +
-    theme_minimal(base_size = 12) +
+    scale_x_continuous(name = "Restorable area (million km²)", labels = function(x) format(x, scientific = FALSE)) +
+    theme_minimal(base_size = 7) +
     theme(
       legend.title = element_blank(),
       legend.position = "top",
@@ -167,25 +193,45 @@ make_priority_plot <- function(df) {
 }
 
 # ---------- 2. Generate plots ----------
-biodiv_plot <- make_priority_plot(top30_biod)
-carbon_plot <- make_priority_plot(top30_carbon)
-opp_cost_plot <- make_priority_plot(bottom_30_oppcost)
+biodiv_plot <- make_priority_plot(top30_biod)+ggtitle("biodiversity priority areas")
+carbon_plot <- make_priority_plot(top30_carbon)+ggtitle("carbon priority areas")
+opp_cost_plot <- make_priority_plot(bottom_30_oppcost)+ggtitle("cost priority areas")
 
 # ---------- 3. Print or save ----------
 biodiv_plot
 carbon_plot
-opp_cost_plot
-cowplot::plot_grid(biodiv_plot,carbon_plot)
+opp_cost_plot # check this NA on OC!
+#cowplot::plot_grid(biodiv_plot,carbon_plot)
+
+
+# save as a combined plot
+
+panel_plot <- ggarrange(
+  biodiv_plot,
+  carbon_plot,
+  opp_cost_plot,
+  ncol = 3,    # Number of columns
+  nrow = 1,    # Single row
+  labels = c("A", "B", "C"),  # Optional: adds subplot labels
+  align = "hv",               # Align plots horizontally and vertically
+  common.legend = TRUE,       # Set to TRUE if all plots share the same legend
+  legend = "top"           # Position of the shared legend
+)
+
 # Optionally save them:
  ggsave("figures/NR_top_biod.png", biodiv_plot, width = 6, height = 6, dpi = 300,bg = "white")
  ggsave("figures/NR_top_carbon.png", carbon_plot, width = 6, height = 6, dpi = 300,bg = "white")
  ggsave("figures/NR_lowest_oppcost.png", opp_cost_plot, width = 6, height = 6, dpi = 300,bg = "white")
  
+ ggsave(filename = "figures/panel_top_biod_top_carbon_loweroc.png", panel_plot, width = 16, 
+        height = 8, dpi = 300,bg = "white",units = "cm")
+ 
+ 
 #-----------------------------------------------------
 #Make a quick map of high regen and lot regen areas
 #-----------------------------------------------------
  library(ggplot2)
- library(dplyr)
+ #library(dplyr)
  library(sf)
  library(rnaturalearth)
  library(rnaturalearthdata)
@@ -194,7 +240,9 @@ cowplot::plot_grid(biodiv_plot,carbon_plot)
  world <- ne_countries(scale = "medium", returnclass = "sf")
  
  # Reusable plotting function
- make_regen_map <- function(data, title, filename) {
+ make_regen_map <- function(data, title
+                            #, filename
+                            ) {
    plot_df <- data %>%
      mutate(
        regen_label = if_else(regen_05 == 1, "High regeneration potential", "Low regeneration potential")
@@ -202,19 +250,19 @@ cowplot::plot_grid(biodiv_plot,carbon_plot)
    
    map <- ggplot() +
      geom_sf(data = world, fill = "grey95", color = "white", size = 0.3) +
-     geom_point(
+     geom_raster(
        data = plot_df,
-       aes(x = x, y = y, color = regen_label),
-       alpha = 0.7,
-       size = 0.7,
-       shape = 15
+       aes(x = x, y = y, fill = regen_label),
+       alpha = 0.7
      ) +
-     scale_color_manual(
-       values = c("Low regeneration potential" = "#E69F00", 
-                  "High regeneration potential" = "#009E73")
+     scale_fill_manual(
+       values = c(
+         "Low regeneration potential" = "#E69F00",
+         "High regeneration potential" = "#009E73"
+       )
      ) +
      coord_sf(xlim = c(-100, 160), ylim = c(-30, 30), expand = FALSE) +
-     theme_minimal(base_size = 13) +
+     theme_minimal(base_size = 8) +
      theme(
        panel.background = element_rect(fill = "white", color = NA),
        panel.grid = element_blank(),
@@ -225,19 +273,36 @@ cowplot::plot_grid(biodiv_plot,carbon_plot)
        axis.ticks = element_blank()
      ) +
      ggtitle(title) +
-     guides(color = guide_legend(override.aes = list(size = 3)))
+     guides(color = guide_legend(override.aes = list(size = 2)))
    
-   ggsave(filename, map, width = 10, height = 6, dpi = 300, bg = "white")
+   #ggsave(filename, map, width = 10, height = 6, dpi = 300, bg = "white")
  }
  
- # Run function for biodiversity and carbon maps
- top30_biod_map <- df_global %>% filter(biodiversity_decile <= 3) 
- top30_carbon_map <- df_global %>% filter(carbon_decile >= 7)   
+# Run function for biodiversity and carbon maps
+ 
+# top 30% pixels for biodiversity 
+top30_biod_map <- df_global %>% filter(biodiversity_decile <= 3) 
+top30_carbon_map <- df_global %>% filter(carbon_decile >= 7)   
    
  
- make_regen_map(top30_biod_map, "Regeneration potential for top biodiversity areas", "Figures/topBio_regeneration_map.png")
- make_regen_map(top30_carbon_map, "Regeneration potential for top carbon areas", "Figures/topCarbon_regeneration_map.png")
+bio_map <- make_regen_map(top30_biod_map
+                          , "Regeneration potential for top biodiversity areas"
+                          #,"Figures/topBio_regeneration_map.png"
+                          )
+carbon_map <- make_regen_map(top30_carbon_map,
+                             "Regeneration potential for top carbon areas"
+                             #, "Figures/topCarbon_regeneration_map.png"
+                             )
  
+
+# saving
+
+ggsave("Figures/topBio_regeneration_map.png", bio_map, width = 16, height = 6, 
+       dpi = 300, bg = "white",units = "cm")
+
+
+ggsave("Figures/topCarbon_regeneration_map.png", carbon_map, width = 16, 
+       height = 6,dpi = 300, bg = "white",units = "cm")
 # top30_biod
 # 
 #  library(ggplot2)

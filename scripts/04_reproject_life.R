@@ -9,7 +9,7 @@ library(terra)
 base_raster <- rast("rasters/nat_regeneration_cost_latlong_1km.tif")
 
 #Read in LIFE (not sure if this is the latest version)
-LIFE_path <- "rasters/Eyres_et_al_2025/Eyres_et_al_2025/" 
+LIFE_path <- "rasters/Eyres_et_al_2025/" 
 LIFE <- rast(paste0(LIFE_path, "scaled_restore_0.25.tif"))
 LIFE <- LIFE[[1]]
 
