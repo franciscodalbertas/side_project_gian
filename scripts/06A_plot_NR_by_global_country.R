@@ -21,7 +21,7 @@ df <- df %>%   mutate(
 
 # Summarize the number of NAs per column
 na_summary <- miss_var_summary(df)
-#87% if arable lands are missing nat regen data; likely because 
+#89% if arable lands are missing nat regen data; likely because 
 #(1)Nat regen is only calculated for moist tropics  (for countries located at least in part within humid tropical and subtropical forest biomes (tropical and subtropical dry broadleaf forests, tropical and subtropical moist broadleaf forests, and tropical and subtropical coniferous forests). )
 
 #remove areas without nat regen potential
@@ -46,7 +46,7 @@ df_nas <- filter(df_global, is.na(country_name))
 #export to shape to check
 df_nas_shp <- sf::st_as_sf(df_nas, coords = c("x", "y"), crs = 4326)
 
-sf::st_write(df_nas_shp, "output_tables/df_nas_country_name.shp")
+sf::st_write(df_nas_shp, "output_tables/df_nas_country_name.shp",delete_layer = TRUE)
 
 # its pixels on the edges!! I can filter them out!
 
@@ -74,17 +74,17 @@ summary(df_global$area_restorable)# this is fraction...of 3.419187 km2
 
 
 #calculate total restorable area by country
-tot_restor <- df_global %>% select(country_name,area_restorable) %>% 
+tot_restor <- df_global %>% select(country_name,area_restorable_km2) %>% 
   group_by(country_name) %>% 
   # calculate area in km2
   #summarise(country_restorable_area_km = sum(area_restorable))
-  summarise(country_restorable_area_km = sum(area_restorable*3.419187, na.rm = TRUE))
+  summarise(country_restorable_area_km = sum(area_restorable_km2, na.rm = TRUE))
 
 #biodiversity plot
 top30_biod <- df_global %>% filter(biodiversity_decile <= 3) %>%  
   group_by(country_name, regen_05) %>%  
   #calculate amount of "priority areas (Chico: for 0 and 1 regen)
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable*3.419187)) %>% 
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
   ungroup() %>%
   group_by(country_name) %>% 
   #calculate amount of "priority areas' by regeneration potential (chico: this is
@@ -94,12 +94,13 @@ top30_biod <- df_global %>% filter(biodiversity_decile <= 3) %>%
    left_join(tot_restor)
 
 head(top30_biod)
+summary(top30_biod$country_restorable_area_km)
 
 #carbon plot 
 top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%  
   group_by(country_name, regen_05) %>%  
   #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable*3.419187)) %>% 
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
   ungroup() %>%
   group_by(country_name) %>%
   #calculate amount of "priority areas' by regeneration potential
@@ -111,7 +112,7 @@ top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%
 bottom_30_oppcost <- df_global %>% filter(oppcost_decile <= 3) %>%  
   group_by(country_name, regen_05) %>% 
   #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable*3.419187)) %>% 
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
   ungroup() %>%
   group_by(country_name) %>%
   #calculate amount of "priority areas' by regeneration potential
@@ -145,8 +146,8 @@ make_priority_plot <- function(df) {
     mutate(
       regen_label = if_else(regen_05 == 1, "High regeneration potential", "Low regeneration potential"),
       country_name = factor(country_name, levels = rev(top_countries)), # Order by descending area
-      country_restorable_area_km = country_restorable_area_km/10^6,
-      priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km/10^6
+      country_restorable_area_km = country_restorable_area_km/10^3,
+      priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km/10^3
       )
   
   # Plot
@@ -176,7 +177,7 @@ make_priority_plot <- function(df) {
         "High regeneration potential" = "#009E73"
       )
     ) +
-    scale_x_continuous(name = "Restorable area (million km²)", labels = function(x) format(x, scientific = FALSE)) +
+    scale_x_continuous(name = "Restorable area (thousand km²)", labels = function(x) format(x, scientific = FALSE)) +
     theme_minimal(base_size = 7) +
     theme(
       legend.title = element_blank(),
@@ -193,9 +194,9 @@ make_priority_plot <- function(df) {
 }
 
 # ---------- 2. Generate plots ----------
-biodiv_plot <- make_priority_plot(top30_biod)+ggtitle("biodiversity priority areas")
-carbon_plot <- make_priority_plot(top30_carbon)+ggtitle("carbon priority areas")
-opp_cost_plot <- make_priority_plot(bottom_30_oppcost)+ggtitle("cost priority areas")
+biodiv_plot <- make_priority_plot(top30_biod)+ggtitle("Biodiversity priority areas")
+carbon_plot <- make_priority_plot(top30_carbon)+ggtitle("Carbon priority areas")
+opp_cost_plot <- make_priority_plot(bottom_30_oppcost)+ggtitle("Cost priority areas")
 
 # ---------- 3. Print or save ----------
 biodiv_plot
@@ -219,9 +220,9 @@ panel_plot <- ggarrange(
 )
 
 # Optionally save them:
- ggsave("figures/NR_top_biod.png", biodiv_plot, width = 6, height = 6, dpi = 300,bg = "white")
- ggsave("figures/NR_top_carbon.png", carbon_plot, width = 6, height = 6, dpi = 300,bg = "white")
- ggsave("figures/NR_lowest_oppcost.png", opp_cost_plot, width = 6, height = 6, dpi = 300,bg = "white")
+ # ggsave("figures/NR_top_biod.png", biodiv_plot, width = 6, height = 6, dpi = 300,bg = "white")
+ # ggsave("figures/NR_top_carbon.png", carbon_plot, width = 6, height = 6, dpi = 300,bg = "white")
+ # ggsave("figures/NR_lowest_oppcost.png", opp_cost_plot, width = 6, height = 6, dpi = 300,bg = "white")
  
  ggsave(filename = "figures/panel_top_biod_top_carbon_loweroc.png", panel_plot, width = 16, 
         height = 8, dpi = 300,bg = "white",units = "cm")
@@ -238,6 +239,7 @@ panel_plot <- ggarrange(
  
  # Load world basemap
  world <- ne_countries(scale = "medium", returnclass = "sf")
+ #world_f <- filter(world, continent %in% c("Africa", "Asia", "South America"))
  
  # Reusable plotting function
  make_regen_map <- function(data, title
@@ -261,6 +263,7 @@ panel_plot <- ggarrange(
          "High regeneration potential" = "#009E73"
        )
      ) +
+     #facet_wrap(~ continent)+
      coord_sf(xlim = c(-100, 160), ylim = c(-30, 30), expand = FALSE) +
      theme_minimal(base_size = 8) +
      theme(
@@ -303,6 +306,89 @@ ggsave("Figures/topBio_regeneration_map.png", bio_map, width = 16, height = 6,
 
 ggsave("Figures/topCarbon_regeneration_map.png", carbon_map, width = 16, 
        height = 6,dpi = 300, bg = "white",units = "cm")
+
+#--- plotting by continent ---
+
+head(world)
+
+
+# Reusable plotting function
+make_regen_map_continent <- function(data, title,Continent) {
+  plot_df <- data %>%
+    mutate(
+      regen_label = if_else(regen_05 == 1, "High regeneration potential", "Low regeneration potential")
+    )
+  
+  map <- ggplot() +
+    geom_sf(data = world %>% filter(continent == Continent), fill = "grey95", color = "white", size = 0.3) +
+    geom_raster(
+      data = plot_df,
+      aes(x = x, y = y, fill = regen_label),
+      alpha = 0.7
+    ) +
+    scale_fill_manual(
+      values = c(
+        "Low regeneration potential" = "#E69F00",
+        "High regeneration potential" = "#009E73"
+      )
+    ) +
+    #facet_wrap(~ continent)+
+    coord_sf(xlim = c(-100, 160), ylim = c(-30, 30), expand = FALSE) +
+    theme_minimal(base_size = 8) +
+    theme(
+      panel.background = element_rect(fill = "white", color = NA),
+      panel.grid = element_blank(),
+      legend.title = element_blank(),
+      legend.position = "top",
+      axis.title = element_blank(),
+      axis.text = element_blank(),
+      axis.ticks = element_blank()
+    ) +
+    ggtitle(title) +
+    guides(color = guide_legend(override.aes = list(size = 2)))
+  
+  #ggsave(filename, map, width = 10, height = 6, dpi = 300, bg = "white")
+}
+
+
+#new function
+
+# append continent info to df_global
+
+df_global <- df_global %>%
+  left_join(world %>% select(adm0_a3, continent), by = c("adm0_a3"))
+
+
+
+# top 30% pixels for biodiversity 
+top30_biod_map <- df_global %>% filter(biodiversity_decile <= 3,
+                                       continent %in% c("Africa",
+                                                        "Asia",
+                                                        "Oceania", 
+                                                        "South America"))%>%
+  mutate(continent = droplevels(factor(continent)),
+         continent = factor(continent))
+
+         
+
+# Split into a list of dataframes by continent
+continent_dfs_bio <- top30_biod_map %>%
+  group_by(continent) %>%
+  group_split()
+
+
+top30_carbon_map <- df_global %>% filter(carbon_decile >= 7)   
+
+
+
+bio_map1 <- make_regen_map(continent_dfs_bio[[1]]
+                          , "Regeneration potential for top biodiversity areas",
+                          continent = "Africa"
+                          #,"Figures/topBio_regeneration_map.png"
+)
+
+bio_map1
+
 # top30_biod
 # 
 #  library(ggplot2)

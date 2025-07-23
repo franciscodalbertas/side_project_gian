@@ -12,7 +12,7 @@ library(terra)
 #- **Units**:  %
 #- **Description**: This raster represents the difference in potential accumulation between the first 25 years of growth, and the 25-year period of the maximum potential accumulation.
 
-base_raster <- rast("rasters/nat_regeneration_cost_latlong_1km.tif")
+base_raster <- rast("rasters/base_raster.tif")
 
 #read in max rate
 carbon <- rast("rasters/max_rate.tif")

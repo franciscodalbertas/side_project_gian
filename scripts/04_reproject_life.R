@@ -5,8 +5,8 @@ library(terra)
 
 #downloaded from https://zenodo.org/records/14188450
 
-#Read in dependencies ####
-base_raster <- rast("rasters/nat_regeneration_cost_latlong_1km.tif")
+#Read in dependencies #### (this raster actaully have ~500m res not 1km)
+base_raster <- rast("rasters/base_raster.tif")
 
 #Read in LIFE (not sure if this is the latest version)
 LIFE_path <- "rasters/Eyres_et_al_2025/" 
@@ -34,7 +34,10 @@ plot(LIFE_r)
 #distributed evenly in 1km2 
 option_space_r <- project(option_space, base_raster,"bilinear")
 min_max <- global(option_space_r, fun = range, na.rm = TRUE)
-option_space_1km <- option_space_r/3419187
+# this calcualtes fraction of the pixel covered. Dont think its what we need
+# we just need area in km2
+option_space_1km <- (option_space_r/3419187)* base_raster
+option_space_km2 <- (option_space_r/10^6)* base_raster
 min_max <- global(option_space_1km, fun = range, na.rm = TRUE)
 
 #save output ####
@@ -42,3 +45,4 @@ min_max <- global(option_space_1km, fun = range, na.rm = TRUE)
 # Save the reprojected raster
 writeRaster(LIFE_r, "rasters/LIFE_latlong_1km.tif", overwrite = TRUE)
 writeRaster(option_space_1km, "rasters/restorable_area_1km.tif", overwrite = TRUE)
+writeRaster(option_space_km2, "rasters/restorable_area_km2.tif", overwrite = TRUE)

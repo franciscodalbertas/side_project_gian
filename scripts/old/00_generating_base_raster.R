@@ -5,6 +5,9 @@ library(sf)
 # Load world shapefile from rnaturalearth
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
+
+# change that to expand only to the extent of the oc data!!
+
 #st_crs(world)
 
 # Define the Mollweide projection (EPSG 54009)
