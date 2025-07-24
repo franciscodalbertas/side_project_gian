@@ -5,7 +5,7 @@ library(terra)
 
 #downloaded from https://zenodo.org/records/14188450
 
-#Read in dependencies #### (this raster actaully have ~500m res not 1km)
+#Read in dependencies 
 base_raster <- rast("rasters/base_raster.tif")
 
 #Read in LIFE (not sure if this is the latest version)
