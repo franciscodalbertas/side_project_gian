@@ -31,9 +31,9 @@ area_restorable_masked <- mask(area_restorable, biod)
 
 
 # plot(carbon_masked)
-# plot(biod_masked)
+# plot(biod)
 # plot(opp_cost_masked)
-# plot(nat_regen)
+# plot(nat_regen_masked)
 # plot(area_restorable_masked)
 
 #combine all
