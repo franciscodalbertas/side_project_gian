@@ -65,55 +65,61 @@ tot_restor <- tot_restor%>%
 arrange(desc(prop_restor)) %>%
   mutate(cum_prop_restor = cumsum(prop_restor))
 
-head(tot_restor,n = 20)
+names(df_global)
 
 
-total_by_country <- df_global %>%
-  filter(biodiversity_decile <= 3) %>%
-  group_by(country_name, regen_05) %>%
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
+#--- function to generate priority table ---
 
-total_summary <- total_by_country %>%
-  group_by(country_name) %>%
-  summarise(total_priority_area = sum(priority_restorable_area_by_regen_km), .groups = "drop") %>%
-  left_join(tot_restor, by = "country_name")
+make_priority_table <- function(df, criteria = NULL) {
+  
+  if (criteria == "biodiversity") {
+    filter_by <- "biodiversity_decile"
+    
+    total_by_country <- df %>%
+      filter(.data[[filter_by]] <= 3) %>%
+      group_by(country_name, regen_05) %>%
+      summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
+    
+  } else if (criteria == "carbon") {
+    filter_by <- "carbon_decile"
+    
+    total_by_country <- df %>%
+      filter(.data[[filter_by]] >= 7) %>%
+      group_by(country_name, regen_05) %>%
+      summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
+  } else if (criteria == "opp_cost") {
+    filter_by <- "oppcost_decile"
+    
+    total_by_country <- df %>%
+      filter(.data[[filter_by]] <= 3) %>%
+      group_by(country_name, regen_05) %>%
+      summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
+  } else {
+    stop("Invalid criteria specified. Use 'biodiversity', 'carbon', or 'opp_cost'.")
+  }
+  
+  
+  total_summary <- total_by_country %>%
+    group_by(country_name) %>%
+    summarise(total_priority_area = sum(priority_restorable_area_by_regen_km), .groups = "drop") %>%
+    left_join(tot_restor, by = "country_name")
+  
+  top30 <- left_join(total_by_country, total_summary, by = "country_name")
+  
+  return(top30)
+}
 
-top30_biod <- left_join(total_by_country, total_summary, by = "country_name")
+#--- generate tables ---
+
+top30_biod <- make_priority_table(df_global, criteria = "biodiversity") 
+top30_carbon <- make_priority_table(df_global, criteria = "carbon") 
+top30_costs <- make_priority_table(df_global, criteria = "opp_cost") 
+
+#--- stats for biodiversity ---
+
+head(top30_biod, n = 10)
 
 rm(df)
-# to do !
-# carbon plot 
-# top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%  
-#   group_by(country_name, regen_05) %>%  
-#   #calculate amount of "priority areas
-#   summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
-#   ungroup() %>%
-#   group_by(country_name) %>%
-#   #calculate amount of "priority areas' by regeneration potential
-#   mutate(total_priority_area = sum(priority_restorable_area_by_regen_km))%>%  
-#   #add total restorable area
-#   left_join(tot_restor)
-# 
-# # oppcost plot
-# bottom_30_oppcost <- df_global %>% filter(oppcost_decile <= 3) %>%  
-#   group_by(country_name, regen_05) %>% 
-#   #calculate amount of "priority areas
-#   summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
-#   ungroup() %>%
-#   group_by(country_name) %>%
-#   #calculate amount of "priority areas' by regeneration potential
-#   mutate(total_priority_area = sum(priority_restorable_area_by_regen_km))%>%  
-#   #add total restorable area
-#   left_join(tot_restor)%>%
-#   #filter out nas
-#   filter(!is.na(country_name))
-
-# I want total priority area by country, and how much of it is high
-# regeneration. Then I can point out the top relevant countris...
-# like the ones that concentrate 50 or so of the areas
-
-
-#biodiv_df <- make_priority_table(top30_biod)
 
 # total area under the 30%
 total_priority <- top30_biod %>%
@@ -168,3 +174,109 @@ top30_biod_priority_areas_regen_country <- top30_biod %>%
   mutate(cum_prop = cumsum(prop))
 
 print(head(top30_biod_priority_areas_regen_country, n = 20), width = Inf)
+
+# --- stats for carbon ---
+
+# total area on top 30% of carbon priority areas
+
+total_priority_C <- top30_carbon %>%
+  select(country_name,total_priority_area ) %>%
+  distinct()%>%
+  ungroup()%>%
+  summarise(total_priority = sum(total_priority_area, na.rm = TRUE), .groups = "drop")%>%
+  pull()
+
+
+# total priority area per country
+
+top30_carbon <- top30_carbon %>%
+  mutate(prop_priority = total_priority_area / total_priority_C,
+         prop_resorable = priority_restorable_area_by_regen_km / total_priority_C)
+
+
+top30_carbon_priority_areas <-  top30_carbon %>%
+  select(country_name,prop_priority ) %>%
+  distinct()%>%
+  # arrange by priority area)
+  arrange(desc(prop_priority)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_priority = cumsum(prop_priority))
+
+print(head(top30_carbon_priority_areas, n = 20), width = Inf)
+
+# summarise how much is high regen potential and how much is low, per country
+
+top30_carbon_priority_areas_regen <- top30_carbon %>%
+  group_by(regen_05 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_C)
+
+
+print(head(top30_carbon_priority_areas_regen, n = 20), width = Inf)
+
+
+top30_carbon_priority_areas_regen_country <- top30_carbon %>%
+  group_by(regen_05,country_name ) %>%
+  distinct()%>%
+  filter(regen_05 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_C) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_carbon_priority_areas_regen_country, n = 20), width = Inf)
+
+# --- stats for costs ---
+
+# total area on top 30% of carbon priority areas
+
+total_priority_oc <- top30_costs %>%
+  select(country_name,total_priority_area ) %>%
+  distinct()%>%
+  ungroup()%>%
+  summarise(total_priority = sum(total_priority_area, na.rm = TRUE), .groups = "drop")%>%
+  pull()
+
+
+# total priority area per country
+
+top30_costs <- top30_costs %>%
+  mutate(prop_priority = total_priority_area / total_priority_oc,
+         prop_resorable = priority_restorable_area_by_regen_km / total_priority_oc)
+
+
+top30_costs_priority_areas <-  top30_costs %>%
+  select(country_name,prop_priority ) %>%
+  distinct()%>%
+  # arrange by priority area)
+  arrange(desc(prop_priority)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_priority = cumsum(prop_priority))
+
+print(head(top30_costs_priority_areas, n = 20), width = Inf)
+
+# summarise how much is high regen potential and how much is low, per country
+
+top30_costs_priority_areas_regen <- top30_costs %>%
+  group_by(regen_05 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_oc)
+
+
+print(head(top30_costs_priority_areas_regen, n = 20), width = Inf)
+
+
+top30_costs_priority_areas_regen_country <- top30_costs %>%
+  group_by(regen_05,country_name ) %>%
+  distinct()%>%
+  filter(regen_05 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_oc) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_costs_priority_areas_regen_country, n = 5), width = Inf)
