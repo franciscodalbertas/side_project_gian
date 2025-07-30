@@ -317,20 +317,36 @@ ggsave("Figures/topCarbon_regeneration_map.png", carbon_map, width = 16,
 # append continent info to df_global
 
 df_global <- df_global %>%
-  left_join(world %>% select(adm0_a3, continent), by = c("adm0_a3"))
+  left_join(world %>% select(adm0_a3, continent, subregion,region_un), by = c("adm0_a3"))
 
 
 # drop spatial info.
 df_global <- st_drop_geometry(df_global)
 
 
+# exclude EUA and Canada from world
+
+world_filt <- world %>% filter(!subregion %in% c("Northern America"))
+
+unique(world_filt$subregion)
+unique(df_global$subregion)
+
+# # Include central america and mexico!
+# 
+# americas <- world %>%filter(continent=="North America",
+#                             # exclude USA and Canada
+#                             !subregion %in% c("Northern America")
+#                             )
+
+
+
 # Reusable plotting function with continent filter
 
-make_regen_map_continent <- function(data, title,Continent) {
+make_regen_map_continent <- function(data, title,region) {
   plot_df <- data %>%
     mutate(
-      regen_label = if_else(regen_05 == 1, "High reg. potential", 
-                            "Low reg. potential")
+      regen_label = if_else(regen_05 == 1, "High reg. pot.", 
+                            "Low reg. pot.")
     )
   
   bbox <- plot_df %>%
@@ -346,7 +362,7 @@ make_regen_map_continent <- function(data, title,Continent) {
   
   
   map <- ggplot() +
-    geom_sf(data = world %>% filter(continent == Continent), 
+    geom_sf(data = world_filt %>% filter(region_un %in% region), 
             fill = "grey95", color = "white", size = 0.3) +
     geom_raster(
       data = plot_df,
@@ -355,8 +371,8 @@ make_regen_map_continent <- function(data, title,Continent) {
     ) +
     scale_fill_manual(
       values = c(
-        "Low reg. potential" = "#E69F00",
-        "High reg. potential" = "#009E73"
+        "Low reg. pot." = "#E69F00",
+        "High reg. pot." = "#009E73"
       )
     ) +
     #facet_wrap(~ continent)+
@@ -375,63 +391,64 @@ make_regen_map_continent <- function(data, title,Continent) {
       text = element_text(size = 8) 
     ) +
     ggtitle(title) +
-    guides(color = guide_legend(override.aes = list(size = 2)),
-           fill = guide_legend(nrow = 2))+
+    # guides(color = guide_legend(override.aes = list(size = 2)),
+    #        fill = guide_legend(nrow = 1)
+    #        )+
     theme(
       legend.position = "top",
       legend.box = "horizontal",
       legend.text = element_text(size = 8),
-      legend.spacing.x = unit(0.5, 'cm')  # Increase spacing between items
+      #legend.spacing.x = unit(0.5, 'cm')  # Increase spacing between items
     )
   
   #ggsave(filename, map, width = 10, height = 6, dpi = 300, bg = "white")
 }
 
 
-
-
 # top 30% pixels for biodiversity per continent
 top30_biod_map <- df_global %>% 
   filter(biodiversity_decile <= 3,
-         continent %in% c("Africa", #[1]
+         region_un %in% c("Africa", #[1]
                           "Asia",#[2]
-                          "Oceania",#[3]
-                          "South America"))#[4]
+                          "Americas"))#[3]
+
+unique(top30_biod_map$region_un)
 
          
 
 # Split into a list of dataframes by continent
 top30_biod_map_continent <- top30_biod_map %>%
-  group_by(continent) %>%
+  group_by(region_un) %>%
   group_split()
 
 
 bio_map_Africa <- make_regen_map_continent(top30_biod_map_continent[[1]],
                             "Africa", # title
-                           Continent = "Africa"
+                           region = "Africa"
                            )
 
-bio_map_Asia <- make_regen_map_continent(top30_biod_map_continent[[2]]
+bio_map_Asia <- make_regen_map_continent(top30_biod_map_continent[[3]]
                                            , "Asia",
-                                           Continent = "Asia"
+                                         region = "Asia"
                                            #,"Figures/topBio_regeneration_map.png"
 )
 
-bio_map_SouthAmerica <- make_regen_map_continent(top30_biod_map_continent[[3]]
-                                         , "South America",
-                                         Continent = "South America"
+
+bio_map_Americas <- make_regen_map_continent(top30_biod_map_continent[[2]]
+                                         , "Latin America",
+                                         region = "Americas"
                                          #,"Figures/topBio_regeneration_map.png"
 )
 
-bio_map_Africa
-bio_map_Asia
-bio_map_SouthAmerica 
+# bio_map_Africa
+# bio_map_Asia
+# bio_map_Americas 
 
 # Combine the maps into a single panel
 panel <- ggarrange(
   bio_map_Africa,
   bio_map_Asia,
-  bio_map_SouthAmerica ,
+  bio_map_Americas  ,
   ncol = 3,    # Number of columns
   #nrow = 1,    # Single row
   #labels = c("Africa", "Asia", "South America"),  # Optional: adds subplot labels
@@ -441,40 +458,41 @@ panel <- ggarrange(
 )
 
 
-ggsave("Figures/top30Bio_regeneration_map_continent.png", panel, width = 19, height = 10, 
+
+ggsave("Figures/top30Bio_regeneration_map_continent.png", panel, width = 17, height = 10, 
        dpi = 300, bg = "white",units = "cm")
+
 
 
 # top carbon
 top30_carbon_map <- df_global %>% 
   filter(carbon_decile <= 7,
-         continent %in% c("Africa", #[1]
-                          "Asia",#[2]
-                          "Oceania",#[3]
-                          "South America"))#[4]
+         region_un %in% c("Africa", #[1]
+                          "Asia",#[3]
+                          "Americas"))#[2]
 
 
 
 # Split into a list of dataframes by continent
 top30_carbon_map_continent <- top30_carbon_map %>%
-  group_by(continent) %>%
+  group_by(region_un) %>%
   group_split()
 
 
 C_map_Africa <- make_regen_map_continent(top30_carbon_map_continent[[1]],
                                            "Africa", # title
-                                           Continent = "Africa"
+                                           region = "Africa"
 )
 
-C_map_Asia <- make_regen_map_continent(top30_carbon_map_continent[[2]]
+C_map_Asia <- make_regen_map_continent(top30_carbon_map_continent[[3]]
                                          , "Asia",
-                                         Continent = "Asia"
+                                         region = "Asia"
                                          #,"Figures/topBio_regeneration_map.png"
 )
 
-C_map_SouthAmerica <- make_regen_map_continent(top30_carbon_map_continent[[4]]
-                                                 , "South America",
-                                                 Continent = "South America"
+C_map_SouthAmerica <- make_regen_map_continent(top30_carbon_map_continent[[2]]
+                                                 , "Latin America",
+                                                 region = "Americas"
                                                  #,"Figures/topBio_regeneration_map.png"
 )
 
@@ -496,7 +514,7 @@ panel_C <- ggarrange(
 )
 
 
-ggsave("Figures/topCarbon_regeneration_map_continent.png", panel_C, width = 19, height = 10, 
+ggsave("Figures/topCarbon_regeneration_map_continent.png", panel_C, width = 17, height = 10, 
        dpi = 300, bg = "white",units = "cm")
 
 
