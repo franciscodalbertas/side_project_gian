@@ -42,6 +42,14 @@ df_global <- df_global %>% mutate(
   regen_05 = case_when(
     nat_regen >= 50 ~ 1,
     nat_regen < 50  ~ 0,
+    TRUE ~ NA_real_  ),
+  regen_04 = case_when(
+    nat_regen >= 40 ~ 1,
+    nat_regen < 40  ~ 0,
+    TRUE ~ NA_real_  ),
+  regen_06 = case_when(
+    nat_regen >= 60 ~ 1,
+    nat_regen < 60  ~ 0,
     TRUE ~ NA_real_  )
 )
 
@@ -65,19 +73,21 @@ tot_restor <- tot_restor%>%
 arrange(desc(prop_restor)) %>%
   mutate(cum_prop_restor = cumsum(prop_restor))
 
-names(df_global)
-
 
 #--- function to generate priority table ---
 
-make_priority_table <- function(df, criteria = NULL) {
+make_priority_table <- function(df, criteria = NULL, threshold = NULL) {
+  
+  
+  regen_col <- sym(paste0("regen_", threshold))
   
   if (criteria == "biodiversity") {
+    
     filter_by <- "biodiversity_decile"
     
     total_by_country <- df %>%
       filter(.data[[filter_by]] <= 3) %>%
-      group_by(country_name, regen_05) %>%
+      group_by(country_name, !!regen_col) %>%
       summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
     
   } else if (criteria == "carbon") {
@@ -85,14 +95,14 @@ make_priority_table <- function(df, criteria = NULL) {
     
     total_by_country <- df %>%
       filter(.data[[filter_by]] >= 7) %>%
-      group_by(country_name, regen_05) %>%
+      group_by(country_name, !!regen_col) %>%
       summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
   } else if (criteria == "opp_cost") {
     filter_by <- "oppcost_decile"
     
     total_by_country <- df %>%
       filter(.data[[filter_by]] <= 3) %>%
-      group_by(country_name, regen_05) %>%
+      group_by(country_name, !!regen_col) %>%
       summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2, na.rm = TRUE), .groups = "drop")
   } else {
     stop("Invalid criteria specified. Use 'biodiversity', 'carbon', or 'opp_cost'.")
@@ -111,15 +121,25 @@ make_priority_table <- function(df, criteria = NULL) {
 
 #--- generate tables ---
 
-top30_biod <- make_priority_table(df_global, criteria = "biodiversity") 
-top30_carbon <- make_priority_table(df_global, criteria = "carbon") 
-top30_costs <- make_priority_table(df_global, criteria = "opp_cost") 
+# 50%
+top30_biod <- make_priority_table(df_global, criteria = "biodiversity",threshold = "05") 
+top30_carbon <- make_priority_table(df_global, criteria = "carbon",threshold = "05") 
+top30_costs <- make_priority_table(df_global, criteria = "opp_cost",threshold = "05") 
 
-#--- stats for biodiversity ---
 
-head(top30_biod, n = 10)
+# 40%
+top30_biod_40 <- make_priority_table(df_global, criteria = "biodiversity",threshold = "04") 
+top30_carbon_40 <- make_priority_table(df_global, criteria = "carbon",threshold = "04") 
+top30_costs_40 <- make_priority_table(df_global, criteria = "opp_cost",threshold = "04") 
 
-rm(df)
+# 60%
+top30_biod_60 <- make_priority_table(df_global, criteria = "biodiversity",threshold = "06") 
+top30_carbon_60 <- make_priority_table(df_global, criteria = "carbon",threshold = "06") 
+top30_costs_60 <- make_priority_table(df_global, criteria = "opp_cost",threshold = "06") 
+
+
+#---- stats for biodiversity for 50%----
+
 
 # total area under the 30%
 total_priority <- top30_biod %>%
@@ -129,16 +149,26 @@ total_priority <- top30_biod %>%
   summarise(total_priority = sum(total_priority_area, na.rm = TRUE), .groups = "drop")%>%
   pull()
 
-
-# total priority area per country
+#---- total priority area per country ----
 
 top30_biod <- top30_biod %>%
    mutate(prop_priority = total_priority_area / total_priority,
          prop_resorable = priority_restorable_area_by_regen_km / total_priority)
   
+
+top30_biod_40 <- top30_biod_40 %>%
+  mutate(prop_priority = total_priority_area / total_priority,
+         prop_resorable = priority_restorable_area_by_regen_km / total_priority)
+
+top30_biod_60 <- top30_biod_60 %>%
+  mutate(prop_priority = total_priority_area / total_priority,
+         prop_resorable = priority_restorable_area_by_regen_km / total_priority)
+
+
   
 print(head(top30_biod, n = 10), width = Inf)
-
+print(head(top30_biod_40, n = 10), width = Inf)
+#---- 50% ----
 top30_biod_priority_areas <-  top30_biod %>%
   select(country_name,prop_priority ) %>%
   distinct()%>%
@@ -150,9 +180,9 @@ top30_biod_priority_areas <-  top30_biod %>%
 print(head(top30_biod_priority_areas, n = 20), width = Inf)
 # Brazil, Madagascar, Mexico, India, Colombia and Peru
 
+#- summarise how much is high regen potential and how much is low --------------
 
-# summarise how much is high regen potential and how much is low, per country
-
+# 50%
 top30_biod_priority_areas_regen <- top30_biod %>%
   group_by(regen_05 ) %>%
   distinct()%>%
@@ -162,7 +192,29 @@ top30_biod_priority_areas_regen <- top30_biod %>%
 
 print(head(top30_biod_priority_areas_regen, n = 20), width = Inf)
 
+# 40%
+top30_biod_priority_areas_regen_40 <- top30_biod_40 %>%
+  group_by(regen_04 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority)
 
+
+print(head(top30_biod_priority_areas_regen_40, n = 20), width = Inf)
+
+# 60%
+top30_biod_priority_areas_regen_60 <- top30_biod_60 %>%
+  group_by(regen_06 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority)
+
+
+print(head(top30_biod_priority_areas_regen_60, n = 20), width = Inf)
+
+#---- summarise it per country ----
+
+# 50
 top30_biod_priority_areas_regen_country <- top30_biod %>%
   group_by(regen_05,country_name ) %>%
   distinct()%>%
@@ -173,12 +225,42 @@ top30_biod_priority_areas_regen_country <- top30_biod %>%
   # this needs to be dune following the order of area!!
   mutate(cum_prop = cumsum(prop))
 
-print(head(top30_biod_priority_areas_regen_country, n = 20), width = Inf)
+print(head(top30_biod_priority_areas_regen_country, n = 6), width = Inf)
+# Nicaragua, colombia, mexico, indoneia, Brazil
 
-# --- stats for carbon ---
+# 40
+top30_biod_priority_areas_regen_country_40 <- top30_biod_40 %>%
+  group_by(regen_04,country_name ) %>%
+  distinct()%>%
+  filter(regen_04 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_biod_priority_areas_regen_country_40, n = 6), width = Inf)
+# top 5: nicaragua, colombia, mexico, indonesia, brazil
+
+# 60
+top30_biod_priority_areas_regen_country_60 <- top30_biod_60 %>%
+  group_by(regen_06,country_name ) %>%
+  distinct()%>%
+  filter(regen_06 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_biod_priority_areas_regen_country_60, n = 6), width = Inf)
+# Nicaragua, Mexico, Madagascar, Indonesia, Colombia
+
+# ---- stats for carbon ----
 
 # total area on top 30% of carbon priority areas
 
+# 50%
 total_priority_C <- top30_carbon %>%
   select(country_name,total_priority_area ) %>%
   distinct()%>%
@@ -204,8 +286,9 @@ top30_carbon_priority_areas <-  top30_carbon %>%
 
 print(head(top30_carbon_priority_areas, n = 20), width = Inf)
 
-# summarise how much is high regen potential and how much is low, per country
+#---- summarise how much is high regen potential and how much is low, per country-
 
+# 50%
 top30_carbon_priority_areas_regen <- top30_carbon %>%
   group_by(regen_05 ) %>%
   distinct()%>%
@@ -216,6 +299,28 @@ top30_carbon_priority_areas_regen <- top30_carbon %>%
 print(head(top30_carbon_priority_areas_regen, n = 20), width = Inf)
 
 
+# 40%
+top30_carbon_priority_areas_regen_40 <- top30_carbon_40 %>%
+  group_by(regen_04 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_C)
+
+
+print(head(top30_carbon_priority_areas_regen_40, n = 6), width = Inf)
+
+# 60%
+top30_carbon_priority_areas_regen_60 <- top30_carbon_60 %>%
+  group_by(regen_06 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_C)
+
+
+print(head(top30_carbon_priority_areas_regen_60, n = 6), width = Inf)
+
+#---- summarise per country ------
+# 50%
 top30_carbon_priority_areas_regen_country <- top30_carbon %>%
   group_by(regen_05,country_name ) %>%
   distinct()%>%
@@ -226,7 +331,36 @@ top30_carbon_priority_areas_regen_country <- top30_carbon %>%
   # this needs to be dune following the order of area!!
   mutate(cum_prop = cumsum(prop))
 
-print(head(top30_carbon_priority_areas_regen_country, n = 20), width = Inf)
+print(head(top30_carbon_priority_areas_regen_country, n = 5), width = Inf)
+# Brazil, colombia, mexico, nicaragua, indonesia
+
+# 40%
+top30_carbon_priority_areas_regen_country_40 <- top30_carbon_40 %>%
+  group_by(regen_04,country_name ) %>%
+  distinct()%>%
+  filter(regen_04 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_C) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_carbon_priority_areas_regen_country_40, n = 5), width = Inf)
+# brazil, colombia, Mexico, Nicaragua, Indonesia
+
+# 60%
+top30_carbon_priority_areas_regen_country_60 <- top30_carbon_60 %>%
+  group_by(regen_06,country_name ) %>%
+  distinct()%>%
+  filter(regen_06 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_C) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_carbon_priority_areas_regen_country_60, n = 6), width = Inf)
+# Brazil, nicaracgua, mexico, colombia, guatemala
 
 # --- stats for costs ---
 
@@ -257,8 +391,9 @@ top30_costs_priority_areas <-  top30_costs %>%
 
 print(head(top30_costs_priority_areas, n = 20), width = Inf)
 
-# summarise how much is high regen potential and how much is low, per country
+#---- summarise how much is high regen potential and how much is low, per country -
 
+# 50%
 top30_costs_priority_areas_regen <- top30_costs %>%
   group_by(regen_05 ) %>%
   distinct()%>%
@@ -268,7 +403,28 @@ top30_costs_priority_areas_regen <- top30_costs %>%
 
 print(head(top30_costs_priority_areas_regen, n = 20), width = Inf)
 
+# 40%
+top30_costs_priority_areas_regen_40 <- top30_costs_40 %>%
+  group_by(regen_04 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_oc)
 
+
+print(head(top30_costs_priority_areas_regen_40, n = 20), width = Inf)
+
+# 60%
+top30_costs_priority_areas_regen_60 <- top30_costs_60 %>%
+  group_by(regen_06 ) %>%
+  distinct()%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_oc)
+
+
+print(head(top30_costs_priority_areas_regen_60, n = 5), width = Inf)
+
+# ---- summarise per country ------
+#50%
 top30_costs_priority_areas_regen_country <- top30_costs %>%
   group_by(regen_05,country_name ) %>%
   distinct()%>%
@@ -280,3 +436,32 @@ top30_costs_priority_areas_regen_country <- top30_costs %>%
   mutate(cum_prop = cumsum(prop))
 
 print(head(top30_costs_priority_areas_regen_country, n = 5), width = Inf)
+# mexico, brazil, colombia, madagascar, nicaragua
+
+#40%
+top30_costs_priority_areas_regen_country_40 <- top30_costs_40 %>%
+  group_by(regen_04,country_name ) %>%
+  distinct()%>%
+  filter(regen_04 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_oc) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_costs_priority_areas_regen_country_40, n = 7), width = Inf)
+# brazil, mexico, colombia, madagascar, nicaragua
+
+#60%
+top30_costs_priority_areas_regen_country_60 <- top30_costs_60 %>%
+  group_by(regen_06,country_name ) %>%
+  distinct()%>%
+  filter(regen_06 ==1)%>%
+  summarise(total = sum(priority_restorable_area_by_regen_km))%>%
+  mutate(prop = total/total_priority_oc) %>%
+  arrange(desc(prop)) %>%
+  # this needs to be dune following the order of area!!
+  mutate(cum_prop = cumsum(prop))
+
+print(head(top30_costs_priority_areas_regen_country_60, n = 5), width = Inf)
+# mexico, brazil, colombia,  nicaragua, madagascar
