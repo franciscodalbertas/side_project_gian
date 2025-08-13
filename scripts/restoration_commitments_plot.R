@@ -47,6 +47,14 @@ df_global <- df_global %>% mutate(
   regen_05 = case_when(
     nat_regen >= 50 ~ 1,
     nat_regen < 50  ~ 0,
+    TRUE ~ NA_real_  ),
+  regen_04 = case_when(
+    nat_regen >= 40 ~ 1,
+    nat_regen < 40  ~ 0,
+    TRUE ~ NA_real_  ),
+  regen_06 = case_when(
+    nat_regen >= 60 ~ 1,
+    nat_regen < 60  ~ 0,
     TRUE ~ NA_real_  )
 )
 
@@ -59,6 +67,7 @@ tot_restor <- df_global %>% select(country_name,area_restorable_km2) %>%
   summarise(country_restorable_area_km = sum(area_restorable_km2, na.rm = TRUE))
 
 
+#---- central analysis 50% ----
 #biodiversity plot
 top30_biod <- df_global %>% filter(biodiversity_decile <= 3) %>%  
   group_by(country_name, regen_05) %>%  
