@@ -1,2 +1,9 @@
 Restoration commitments by country obtained from:
 https://grih.info/global-restoration-commitment-details/
+
+References:
+Values are in hectare
+LDN: Land Degradation Neutrality
+NBSAP: National Biodiversity Strategies and Action Plans
+NDC: Nationally Determined Contributions
+Bonn Challenge
