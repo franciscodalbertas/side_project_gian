@@ -241,3 +241,161 @@ panel <- ggarrange(total_area,high_regen_pot,high_regen_pot_C,ncol = 3,
 
 ggsave("Figures/prop_commitments.png", panel, width = 16, height = 8, 
        dpi = 300, bg = "white",units = "cm")
+
+
+#---- normalizing top areas per country ----------------------------------------
+
+top30_biod_norm_india <- df_global %>% 
+  # group by country
+  group_by(adm0_a3,country_name)%>%
+  # calculate deciles
+  mutate(
+    carbon_decile = ntile(carbon, 10),
+    biodiversity_decile =  ntile(biodiversity, 10), 
+    oppcost_decile = ntile(opp_cost, 10)
+  ) %>%
+  filter(country_name=="India")%>%
+  ungroup() %>%
+  filter(biodiversity_decile <= 3) %>%  
+  group_by(country_name, regen_05) %>%  
+  #calculate amount of "priority areas (Chico: for 0 and 1 regen)
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
+  ungroup() %>%
+  group_by(country_name) %>% 
+  #calculate amount of "priority areas' by regeneration potential (chico: this is
+  # total restorable area for each country)
+  mutate(total_priority_area = sum(priority_restorable_area_by_regen_km)) %>%  
+  #add total restorable area
+  left_join(tot_restor)
+
+
+
+#---- central analysis 50% ----
+#biodiversity plot
+top30_biod_norm <- df_global %>% 
+  # group by country
+  group_by(adm0_a3,country_name)%>%
+  # calculate deciles
+  mutate(
+    carbon_decile = ntile(carbon, 10),
+    biodiversity_decile =  ntile(biodiversity, 10), 
+    oppcost_decile = ntile(opp_cost, 10)
+  ) %>%
+  ungroup() %>%
+  filter(biodiversity_decile <= 3) %>%  
+  group_by(country_name, regen_05) %>%  
+  #calculate amount of "priority areas (Chico: for 0 and 1 regen)
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
+  ungroup() %>%
+  group_by(country_name) %>% 
+  #calculate amount of "priority areas' by regeneration potential (chico: this is
+  # total restorable area for each country)
+  mutate(total_priority_area = sum(priority_restorable_area_by_regen_km)) %>%  
+  #add total restorable area
+  left_join(tot_restor)
+
+
+#carbon plot
+top30_carbon_norm <- df_global %>% 
+  # group by country
+  group_by(adm0_a3,country_name)%>%
+  # calculate deciles
+  mutate(
+    carbon_decile = ntile(carbon, 10),
+    biodiversity_decile =  ntile(biodiversity, 10), 
+    oppcost_decile = ntile(opp_cost, 10)
+  ) %>%
+  ungroup() %>%
+  filter(carbon_decile >= 7) %>%
+  group_by(country_name, regen_05) %>%
+  #calculate amount of "priority areas
+  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>%
+  ungroup() %>%
+  group_by(country_name) %>%
+  #calculate amount of "priority areas' by regeneration potential
+  mutate(total_priority_area = sum(priority_restorable_area_by_regen_km))%>%
+  #add total restorable area
+  left_join(tot_restor)
+
+
+
+#---- add commitments to biod. and carbon normalized ----
+
+top30_biod2_norm <- top30_biod_norm %>%
+  filter(country_name %in%top_countries) %>%
+  left_join(comm %>% select(country,single_highest_commitment_km2),
+            by= join_by("country_name"=="country"))
+
+
+top30_carbon2_norm <- top30_carbon_norm %>%
+  filter(country_name %in%top_countries) %>%
+  left_join(comm %>% select(country,single_highest_commitment_km2),
+            by= join_by("country_name"=="country"))
+
+# ---- ploting national priorities ----
+
+# priority area
+
+high_regen_pot_norm <- top30_biod2_norm %>%
+  filter(regen_05 == 1) %>%
+  mutate(
+    country_name = factor(country_name, levels = rev(top_countries)),
+    single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
+    priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
+    proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
+    proportion = if_else(proportion>1,1,proportion)
+    
+  ) %>%
+  ggplot() +
+  geom_col( aes(
+    x = proportion,
+    y = country_name
+  ),
+  fill = "#009E73",
+  alpha = 0.7
+  ) +
+  scale_x_continuous(
+    name = "Proportion in areas with high reg. pot.",
+    labels = function(x) format(x, scientific = FALSE)
+  ) +
+  theme_minimal(base_size = 7) +
+  ggtitle("Biodiversity priority areas") +
+  my_theme
+
+high_regen_pot_C_nrom <- top30_carbon2_norm %>%
+  filter(regen_05 == 1) %>%
+  mutate(
+    country_name = factor(country_name, levels = rev(top_countries)),
+    single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
+    priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
+    proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
+    proportion = if_else(proportion>1,1,proportion)
+    
+  ) %>%
+  ggplot() +
+  geom_col( aes(
+    x = proportion,
+    y = country_name
+  ),
+  fill = "#009E73",
+  alpha = 0.7
+  ) +
+  scale_x_continuous(
+    name = "Proportion in areas with high reg. pot.",
+    labels = function(x) format(x, scientific = FALSE)
+  ) +
+  theme_minimal(base_size = 7) +
+  ggtitle("Carbon priority areas") +
+  my_theme
+
+
+
+panel_norm <- ggarrange(total_area,high_regen_pot_norm,high_regen_pot_C_nrom,ncol = 3,
+                   labels = c("A","B","C"),
+                   align = "hv")
+
+
+# saving
+
+ggsave("Figures/prop_commitments_country_norm.png", panel_norm, width = 16, height = 8, 
+       dpi = 300, bg = "white",units = "cm")

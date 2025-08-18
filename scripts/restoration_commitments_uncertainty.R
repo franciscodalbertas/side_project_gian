@@ -285,5 +285,3 @@ top30_carbon2_60 <- top30_carbon_60 %>%
   )
 
 
-
-

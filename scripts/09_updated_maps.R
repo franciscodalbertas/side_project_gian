@@ -54,10 +54,8 @@ df_global <- df_global %>% mutate(
 # Load world basemap
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
-# make a tropics layer!
 
-
-unique(top30_biod_map$subregion)
+# will redo all the above to zoom over ecoregions !
 
 # box for caribbean and central america
 box_caribbean <- world %>%
@@ -72,7 +70,6 @@ bbox_poly_caribbean <- st_as_sfc(bbox_caribbean)
 
 
 # box for Andean region (??- will need to name it)
-unique(box_eastern_SA$adm0_a3)
 #"VEN","COL",
 
 
@@ -149,10 +146,6 @@ narrow_top_right <- function(rect_sfc, dx_right = 20, dy_up = 20) {
 # narrow 20° up and 20° right (i.e., shrink from bottom & left)
 bbox_poly_eafr_n  <- narrow_top_right(bbox_poly_eafr, dx_right = 10, dy_up = 10)
 
-
-
-
-
 # southern asia (India+Sri lanka)
 box_sa <- world %>%
   filter(sovereignt%in% c("India",
@@ -180,20 +173,45 @@ st_crs(bbox_sa_shifted) <- st_crs(bbox_poly_sea)
 
 
 
-cap_to_tropics <- function(rect_sfc, lat = 23.4366) {
-  # ensure geographic CRS (degrees)
+# cap_to_tropics <- function(rect_sfc, lat = 23.4366) {
+#   # ensure geographic CRS (degrees)
+#   if (is.na(st_crs(rect_sfc))) stop("Box has no CRS set.")
+#   rect_ll <- st_transform(rect_sfc, 4326)
+#   
+#   bb <- st_bbox(rect_ll)
+#   bb["ymin"] <- max(bb["ymin"], -lat)
+#   bb["ymax"] <- min(bb["ymax"],  lat)
+#   
+#   # if the box ends up inverted (entirely outside tropics), return empty
+#   if (bb["ymin"] >= bb["ymax"]) return(st_sfc(geometrycollection(), crs = 4326))
+#   
+#   st_as_sfc(bb, crs = 4326) |> st_transform(st_crs(rect_sfc))
+# }
+
+
+cap_to_tropics <- function(rect_sfc, lat = 23.4366, lon_min = -110, lon_max = 130) {
   if (is.na(st_crs(rect_sfc))) stop("Box has no CRS set.")
+  crs0 <- st_crs(rect_sfc)
+  
+  # work in lon/lat
   rect_ll <- st_transform(rect_sfc, 4326)
   
   bb <- st_bbox(rect_ll)
+  # cap lat
   bb["ymin"] <- max(bb["ymin"], -lat)
   bb["ymax"] <- min(bb["ymax"],  lat)
+  # cap lon
+  bb["xmin"] <- max(bb["xmin"], lon_min)
+  bb["xmax"] <- min(bb["xmax"], lon_max)
   
-  # if the box ends up inverted (entirely outside tropics), return empty
-  if (bb["ymin"] >= bb["ymax"]) return(st_sfc(geometrycollection(), crs = 4326))
+  # empty if completely outside caps
+  if (bb["ymin"] >= bb["ymax"] || bb["xmin"] >= bb["xmax"]) {
+    return(st_sfc(st_geometrycollection(), crs = crs0))
+  }
   
-  st_as_sfc(bb, crs = 4326) |> st_transform(st_crs(rect_sfc))
+  st_as_sfc(bb, crs = 4326) |> st_transform(crs0)
 }
+
 
 # Apply to boxes
 bbox_caribbean_trop <- cap_to_tropics(bbox_poly_caribbean)
@@ -275,7 +293,7 @@ make_regen_map <- function(data, title
     )
   
   map <- ggplot() +
-    geom_sf(data = tropics, fill = "grey95", color = "white", size = 0.3) +
+    geom_sf(data = world_filt, fill = "grey95", color = "white", size = 0.3) +
     geom_raster(
       data = plot_df,
       aes(x = x, y = y, fill = regen_label),
@@ -289,8 +307,9 @@ make_regen_map <- function(data, title
     ) +
     #facet_wrap(~ continent)+
     coord_sf(xlim = c(-100, 160), ylim = c(-30, 30), expand = FALSE) +
-    theme_minimal(base_size = 8) +
+    theme_minimal(base_size = 7) +
     theme(
+      plot.margin = margin(0,0,0,0),
       panel.background = element_rect(fill = "white", color = NA),
       #panel.grid = element_blank(),
       legend.title = element_blank(),
@@ -310,6 +329,13 @@ make_regen_map <- function(data, title
 # top 30% pixels for biodiversity 
 top30_biod_map <- df_global %>% filter(biodiversity_decile <= 3) 
 
+# generate raster to make map on QGIS!
+
+terra::rasterize()
+
+
+
+
 
 # need to focus in the tropics only, exclude the rest!!
 
@@ -324,29 +350,30 @@ bio_map <- make_regen_map(top30_biod_map,"")+
   geom_sf(data = bbox_sea_trop, fill = NA, color = "black", size = 1)+
   # Tropics lines
   coord_sf(
-    xlim = c(-180, 180),
+    xlim = c(-110, 130),
     ylim = c(-23.4366, 23.4366),
     expand = FALSE
   )+
   # labels (white halo under black text for readability)
   geom_text(data = labels_df, aes(x, y, label = label),
-            color = "white", size = 5, fontface = "bold") +
+            color = "white", size = 2, fontface = "bold") +
   geom_text(data = labels_df, aes(x, y, label = label),
-            color = "black", size = 4, fontface = "bold")
+            color = "black", size = 3, fontface = "bold")
 
 bio_map
 
 # now make the zoomed-in areas
 
-a_p <- bio_map <- make_regen_map(top30_biod_map,"")+
-  # zoom in box A
-  coord_sf(
-    xlim = c(bbox_caribbean_trop["xmin"], bbox_caribbean_trop["xmax"]),
-    ylim = c(bbox_caribbean_trop["ymin"], bbox_caribbean_trop["ymax"]),
-    expand = FALSE
-  )
+# a_p <- bio_map +
+#   # zoom in box A
+#   coord_sf(
+#     xlim = c(bbox_caribbean_trop["xmin"], bbox_caribbean_trop["xmax"]),
+#     ylim = c(bbox_caribbean_trop["ymin"], bbox_caribbean_trop["ymax"]),
+#     expand = FALSE
+#   )
 
 # 1) Base plot (whatever your function returns)
+
 base <-  make_regen_map(top30_biod_map,"")+
   theme(
     panel.background = element_rect(fill = "white", color = NA),
@@ -379,7 +406,7 @@ zoom_from_box <- function(base_plot, box_sfc, pad = 0) {
   ylim <- c(unname(bb["ymin"]) - pad, unname(bb["ymax"]) + pad)
   base_plot + coord_sf(xlim = xlim, ylim = ylim, expand = FALSE)+
     theme(
-      plot.tag = element_text(face = "bold", size = 14),
+      plot.tag = element_text(face = "bold", size = 7),
       plot.tag.position = c(0.01, 0.99),
       plot.margin = margin(0,0,0,0),
       legend.position = "none"            # <<< hide legend in each tile
@@ -389,58 +416,101 @@ zoom_from_box <- function(base_plot, box_sfc, pad = 0) {
 # Build a named list of zoomed plots
 zoom_plots <- imap(boxes, ~ zoom_from_box(base, .x, pad = 0))  
 
-# Usage:
-# print a single one
-zoom_plots$A
-zoom_plots$B
 
-# save each individual figure and adjust them on inkscape!!
+# no margin
 
+theme_no_margin <- theme_void() +  # removes axes, grid, background
+  theme(
+    legend.position = "none",
+    plot.margin = unit(c(0, 0, 0, 0), "pt"),  # no plot margin
+    panel.spacing = unit(0, "pt")             # no spacing between panels (if faceted)
+  )
 
+# # Usage:
+# # print a single one
+# a_p <- zoom_plots$A +theme_no_margin
+# b_p <- zoom_plots$B +theme_no_margin
+# c_p <- zoom_plots$C +theme_no_margin
+# d_p <- zoom_plots$D +theme_no_margin
+# 
+# teste <- ggarrange(plotlist = list(a_p,b_p,c_p,d_p),
+#                    widths = c(1,1), 
+#                    heights = c(1,1),
+#                   align = "none",
+#                   hjust = 0, 
+#                   vjust = 0,
+#                   # This is key:
+#                   labels = NULL)
+                   
+# save top figure
+(110+130)/2
+width_cm  <- 18
+aspect    <- 120 / (23.4366 - (-23.4366))
+height_cm <- width_cm / aspect  # ~2.21 cm
 
+# lon_min <- -110
+# lon_max <-  130
+# lat_cap <-  23.4366
+# 
+# lon_span <- lon_max - lon_min          # 240
+# lat_span <- 2 * lat_cap                # 46.8732
+# aspect   <- lon_span / lat_span        # ≈ 5.1202
+# 
+# width_cm  <- 18
+# height_cm <- width_cm / aspect         # ≈ 3.125 cm
+# 
 
-
-# zoom_panel <- ggarrange(plotlist = zoom_plots,align = "hv")
-# 
-# # this is really rubish...easy to just build them in inscape
-# 
-# 
-# # combine top and bottom figures
-# 
-# big_map <- ggarrange(bio_map,zoom_panel,nrow = 2,heights = c(1,2),widths = c(1,1))
-# 
-# 
-# # library(patchwork)
-# # 
-# zoom_plots_tight <- imap(zoom_plots, ~ .x +
-#                            # theme_void() +
-#                            # coord_sf(expand = FALSE) +
-#                            labs(tag = .y) +
-#                            theme(
-#                              #plot.tag = element_text(face = "bold", size = 14),
-#                              plot.tag.position = c(0.01, 0.99),
-#                              plot.margin = margin(0,0,0,0),
-#                              legend.position = "none"            # <<< hide legend in each tile
-#                            )
-# )
-# 
-# 
-# zoom_panel <- wrap_plots(zoom_plots_tight, ncol = 3) &
-#   theme(plot.margin = margin(0,0,0,0))
-# # 
-# # 
-# # big_map <- ggarrange(bio_map,zoom_panel,nrow = 2,heights = c(1,2))
-# # 
-# # 
-# # big_map <- (bio_map + theme(plot.margin = margin(0,0,0,0))) /
-# #   zoom_panel +
-# #   plot_layout(heights = c(1,2))
-# 
-# 
-# 
-# ggsave(plot = big_map,"figures/topBio_regeneration_map_v2.png",
-#        width = 17,
-#        height = 12,
+# ggsave(plot = bio_map,
+#        "figures/panel_plot/top_map.svg",
+#        width = width_cm,
+#        height = height_cm,
 #        units = "cm",
 #        bg = "white")
-# 
+
+ggsave(plot = bio_map,
+       "figures/panel_plot/top_map.png",
+       width = width_cm,
+       height = 5,
+       units = "cm",
+       bg = "white")
+
+# save individual figures
+
+list_bbox <- list(bbox_caribbean,
+                  st_bbox(box_eastern_SA),
+                  bbox_sa,
+                  bbox_eafr,
+                  bbox_madag,
+                  bbox_sa,
+                  bbox_sea
+                  )
+
+
+# bboxes: list of named numeric vectors with xmin, ymin, xmax, ymax
+# width_cm: desired fixed width in cm
+get_heights_from_bboxes <- function(bboxes, width_cm) {
+  sapply(bboxes, function(bb) {
+    dx <- bb["xmax"] - bb["xmin"]
+    dy <- bb["ymax"] - bb["ymin"]
+    aspect <- dx / dy
+    width_cm / aspect
+  })
+}
+
+zoom_width <- 5.3 # cm
+heights_cm <- get_heights_from_bboxes(list_bbox, zoom_width)
+
+# saving individual plots
+
+name_plot <- LETTERS[seq( from = 1, to = 7 )]
+for (i in seq_along(zoom_plots)) {
+  p <- zoom_plots[[i]]
+  ggsave(plot = p,
+         paste0("figures/panel_plot/",name_plot[i],"_map.svg"),
+         width = zoom_width,
+         height = heights_cm[i],
+         units = "cm",
+         bg = "white")
+  
+  
+}
