@@ -137,6 +137,18 @@ top30_biod_60 <- make_priority_table(df_global, criteria = "biodiversity",thresh
 top30_carbon_60 <- make_priority_table(df_global, criteria = "carbon",threshold = "06") 
 top30_costs_60 <- make_priority_table(df_global, criteria = "opp_cost",threshold = "06") 
 
+# --- combine tables for each priority into a single table!
+
+# table with total numbers (disregarding p!)
+
+total_priority <- top30_biod %>%
+  filter(regen_05==1)%>%
+  select(country_name,total_priority_area,prop_restor,cum_prop_restor ) %>%
+  distinct()%>%
+  ungroup()%>%
+  mutate(prop_restor= round(prop_restor,2),
+         cum_prop_restor = round(cum_prop_restor,2))
+
 
 #---- stats for biodiversity for 50%----
 
@@ -225,7 +237,7 @@ top30_biod_priority_areas_regen_country <- top30_biod %>%
   # this needs to be dune following the order of area!!
   mutate(cum_prop = cumsum(prop))
 
-print(head(top30_biod_priority_areas_regen_country, n = 6), width = Inf)
+print(head(top30_biod_priority_areas_regen_country, n = 15), width = Inf)
 # Nicaragua, colombia, mexico, indoneia, Brazil
 
 # 40

@@ -5,10 +5,17 @@ library(rnaturalearth)
 library(dplyr)
 
 carbon <- rast("rasters/max_carbon_rate_reprojected.tif")
+
+plot(carbon)
+
 biod <- rast("rasters/LIFE_latlong_1km.tif")
 opp_cost <- rast("rasters/opp_cost_reprojected.tif")
 nat_regen <- rast("rasters/mosaic_nat_reg_latlong_1km_reprojected.tif")
 area_restorable <- rast("rasters/restorable_area_km2.tif") # this is actual area!
+
+# sum all values!
+
+
 
 names(carbon) <- "carbon"
 names(biod) <- "biodiversity"
@@ -28,6 +35,11 @@ carbon_masked <- mask(carbon, biod)
 opp_cost_masked <- mask(opp_cost, biod)
 nat_regen_masked <- mask(nat_regen, biod)
 area_restorable_masked <- mask(area_restorable, biod)
+
+# get totla area restorable
+
+s <- global(area_restorable_masked, "sum", na.rm = TRUE)
+# 13647209
 
 
 # plot(carbon_masked)

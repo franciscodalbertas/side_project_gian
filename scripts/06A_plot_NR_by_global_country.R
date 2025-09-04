@@ -91,9 +91,15 @@ tot_restor <- df_global %>% select(country_name,area_restorable_km2) %>%
 
 #biodiversity plot
 top30_biod <- df_global %>% filter(biodiversity_decile <= 3) %>%  
+  # calculate cost per cell
+  mutate(final_cost = (opp_cost *100) * area_restorable_km2) %>%
   group_by(country_name, regen_05) %>%  
   #calculate amount of "priority areas (Chico: for 0 and 1 regen)
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
+  summarise(
+    priority_restorable_area_by_regen_km = sum(area_restorable_km2),
+    carbon_benefit = sum(carbon,na.rm = T),
+    opp_cost =  sum(final_cost,na.rm = T)
+    ) %>% 
   ungroup() %>%
   group_by(country_name) %>% 
   #calculate amount of "priority areas' by regeneration potential (chico: this is
@@ -105,11 +111,31 @@ top30_biod <- df_global %>% filter(biodiversity_decile <= 3) %>%
 head(top30_biod)
 summary(top30_biod$country_restorable_area_km)
 
+
+# extract stats
+
+top30_biod %>%
+  #filter(regen_05==1) %>%
+  ungroup %>%
+  summarise(
+    sum(priority_restorable_area_by_regen_km),
+    sum(carbon_benefit),
+    sum(opp_cost)
+    )
+
+
+
 # carbon plot 
 top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%  
+  # calculate cost per cell
+  mutate(final_cost = (opp_cost *100) * area_restorable_km2) %>%
   group_by(country_name, regen_05) %>%  
   #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
+  summarise(
+    priority_restorable_area_by_regen_km = sum(area_restorable_km2),
+    carbon_benefit = sum(carbon,na.rm = T),
+    opp_cost =  sum(final_cost,na.rm = T)
+  ) %>% 
   ungroup() %>%
   group_by(country_name) %>%
   #calculate amount of "priority areas' by regeneration potential
@@ -117,11 +143,30 @@ top30_carbon <- df_global %>% filter(carbon_decile >= 7) %>%
   #add total restorable area
   left_join(tot_restor)
 
+# extract stats
+
+top30_carbon %>%
+  #filter(regen_05==1) %>%
+  ungroup %>%
+  summarise(
+    sum(priority_restorable_area_by_regen_km),
+    sum(carbon_benefit),
+    sum(opp_cost)
+  )
+
+
+
 # oppcost plot
 bottom_30_oppcost <- df_global %>% filter(oppcost_decile <= 3) %>%  
+  # calculate cost per cell
+  mutate(final_cost = (opp_cost *100) * area_restorable_km2) %>%
   group_by(country_name, regen_05) %>% 
   #calculate amount of "priority areas
-  summarise(priority_restorable_area_by_regen_km = sum(area_restorable_km2)) %>% 
+  summarise(
+    priority_restorable_area_by_regen_km = sum(area_restorable_km2),
+    carbon_benefit = sum(carbon,na.rm = T),
+    opp_cost =  sum(final_cost,na.rm = T)
+  ) %>%  
   ungroup() %>%
   group_by(country_name) %>%
   #calculate amount of "priority areas' by regeneration potential
@@ -130,6 +175,17 @@ bottom_30_oppcost <- df_global %>% filter(oppcost_decile <= 3) %>%
   left_join(tot_restor)%>%
   #filter out nas
   filter(!is.na(country_name))
+
+# extract stats
+
+bottom_30_oppcost %>%
+  #filter(regen_05==1) %>%
+  ungroup %>%
+  summarise(
+    sum(priority_restorable_area_by_regen_km),
+    sum(carbon_benefit),
+    sum(opp_cost)
+  )
 
 
 
