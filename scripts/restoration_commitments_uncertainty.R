@@ -172,6 +172,8 @@ comm <- comm %>%
 
 
 
+
+
 #---- will use the single highest commitment ----
 
 top_countries <-top30_biod %>%
@@ -182,20 +184,16 @@ top_countries <-top30_biod %>%
   pull(country_name)
 
 
-# top_countries_40 <-top30_biod_40 %>%
-#   group_by(country_name) %>%
-#   summarise(total_area = unique(country_restorable_area_km), .groups = "drop") %>%
-#   arrange(desc(total_area)) %>%
-#   slice(1:30) %>%
-#   pull(country_name)
-# 
-# top_countries_60 <-top30_biod %>%
-#   group_by(country_name) %>%
-#   summarise(total_area = unique(country_restorable_area_km), .groups = "drop") %>%
-#   arrange(desc(total_area)) %>%
-#   slice(1:30) %>%
-#   pull(country_name)
+# prepare to export it
 
+comm_exp <- comm %>%
+  select(country,single_highest_commitment_km2)%>%
+  mutate(single_highest_commitment_km2 = single_highest_commitment_km2/10^3 )%>%
+  filter(country %in% top_countries)%>%
+  arrange(desc(single_highest_commitment_km2))
+
+
+write.csv(comm_exp,"output_tables/restoration_commitments.csv",row.names = F)
 
 #---- add to carbon and bio ----
 
@@ -210,7 +208,8 @@ top30_biod2 <- top30_biod %>%
     single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
     priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
     proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
-    proportion = if_else(proportion>1,1,proportion)
+    proportion = if_else(proportion>1,1,proportion),
+   priority = "biodiversity"
   )
 
 
@@ -224,8 +223,18 @@ top30_carbon2 <- top30_carbon %>%
     single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
     priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
     proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
-    proportion = if_else(proportion>1,1,proportion)
+    proportion = if_else(proportion>1,1,proportion),
+    priority = "carbon"
   )
+
+# combine tables
+
+top30_combined <- rbind(top30_biod2,top30_carbon2)
+
+top30_combined <- top30_combined %>%
+  select(country_name,priority_restorable_area_by_regen_km,proportion,priority)
+
+
 
 # 40%
 top30_biod2_40 <- top30_biod_40 %>%
@@ -236,9 +245,10 @@ top30_biod2_40 <- top30_biod_40 %>%
   mutate(
     country_name = factor(country_name, levels = rev(top_countries)),
     single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
-    priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
-    proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
-    proportion = if_else(proportion>1,1,proportion)
+    priority_restorable_area_by_regen_km_40 = priority_restorable_area_by_regen_km / 10^3,
+    proportion_40 = priority_restorable_area_by_regen_km_40/single_highest_commitment,
+    proportion_40 = if_else(proportion_40>1,1,proportion_40),
+    priority = "biodiversity"
   )
 
 
@@ -250,11 +260,17 @@ top30_carbon2_40 <- top30_carbon_40 %>%
   mutate(
     country_name = factor(country_name, levels = rev(top_countries)),
     single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
-    priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
-    proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
-    proportion = if_else(proportion>1,1,proportion)
+    priority_restorable_area_by_regen_km_40 = priority_restorable_area_by_regen_km / 10^3,
+    proportion_40 = priority_restorable_area_by_regen_km_40/single_highest_commitment,
+    proportion_40 = if_else(proportion_40>1,1,proportion_40),
+    priority = "carbon"
   )
 
+
+top30_40 <- rbind(top30_biod2_40,top30_carbon2_40) 
+
+top30_40 <- top30_40%>%
+  select(country_name,priority_restorable_area_by_regen_km_40,proportion_40,priority)
 
 # 60%
 top30_biod2_60 <- top30_biod_60 %>%
@@ -265,9 +281,10 @@ top30_biod2_60 <- top30_biod_60 %>%
   mutate(
     country_name = factor(country_name, levels = rev(top_countries)),
     single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
-    priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
-    proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
-    proportion = if_else(proportion>1,1,proportion)
+    priority_restorable_area_by_regen_km_60 = priority_restorable_area_by_regen_km / 10^3,
+    proportion_60 = priority_restorable_area_by_regen_km_60/single_highest_commitment,
+    proportion_60 = if_else(proportion_60>1,1,proportion_60),
+    priority = "biodiversity"
   )
 
 
@@ -279,9 +296,27 @@ top30_carbon2_60 <- top30_carbon_60 %>%
   mutate(
     country_name = factor(country_name, levels = rev(top_countries)),
     single_highest_commitment = single_highest_commitment_km2/ 10^3, # transform in 1000 km2
-    priority_restorable_area_by_regen_km = priority_restorable_area_by_regen_km / 10^3,
-    proportion = priority_restorable_area_by_regen_km/single_highest_commitment,
-    proportion = if_else(proportion>1,1,proportion)
+    priority_restorable_area_by_regen_km_60 = priority_restorable_area_by_regen_km / 10^3,
+    proportion_60 = priority_restorable_area_by_regen_km_60/single_highest_commitment,
+    proportion_60 = if_else(proportion_60>1,1,proportion_60),
+    priority = "carbon"
   )
 
+top30_60 <- rbind(top30_biod2_60,top30_carbon2_60)
 
+top30_60 <- top30_60%>%
+  select(country_name,priority_restorable_area_by_regen_km_60,proportion_60,priority)
+
+
+# add everthing to the table
+
+order_countries <- factor(comm_exp$country)
+
+final <- top30_combined %>%
+  left_join(top30_40) %>%
+  left_join(top30_60) %>%
+  mutate(country_name = factor(country_name, levels = order_countries)) %>%
+  arrange(country_name)
+
+
+write.csv(final,"output_tables/commitments_vs_priorities_b_c.csv",row.names = F)

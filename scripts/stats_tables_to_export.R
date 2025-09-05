@@ -220,6 +220,86 @@ top_30_combined <- rbind(total_bio,total_carbon,total_costs)
 # export
 write.csv(top_30_combined,"output_tables/total_benefits_top30.csv",row.names = F)
 
+#---- total top30 per country --------------------------------------------------
+
+# here I only need proportional area to the total top
+
+total_top30_area_bio <- total_bio %>%
+  pull(area_top30_1000km2)
+
+total_top30_area_C <- total_carbon %>%
+  pull(area_top30_1000km2)
+
+total_top30_area_oc <- total_costs %>%
+  pull(area_top30_1000km2)
+
+total_bio_country <- top30_biod_50 %>%
+  select(priority_restorable_area_by_regen_km,country_restorable_area_1000km,biodiversity,carbon,opp_cost)%>%
+  group_by(country_name)%>%
+  summarise(area_top30_1000km2 = sum(priority_restorable_area_by_regen_km/1000),
+            #LIFE =  sum(biodiversity),
+            #carbon = sum(carbon),
+            #opp_cost = sum(opp_cost)
+            )%>%
+  mutate(
+    proportion = round(area_top30_1000km2/total_top30_area_bio,4),
+    priority= "biodiversity")
+
+
+total_carbon_country <- top30_carbon_50 %>%
+  select(priority_restorable_area_by_regen_km,country_restorable_area_1000km,biodiversity,carbon,opp_cost)%>%
+  group_by(country_name)%>%
+  summarise(
+    area_top30_1000km2 = sum(priority_restorable_area_by_regen_km/1000),
+            #LIFE =  sum(biodiversity),
+            #carbon = sum(carbon),
+            #opp_cost = sum(opp_cost)
+    )%>%
+  mutate(
+    proportion = round(area_top30_1000km2/total_top30_area_C,4),
+    priority= "carbon"
+    )
+
+
+
+total_costs_country <- top30_costs_50 %>%
+  select(priority_restorable_area_by_regen_km,country_restorable_area_1000km,biodiversity,carbon,opp_cost)%>%
+  group_by(country_name)%>%
+  summarise(
+    area_top30_1000km2 = sum(priority_restorable_area_by_regen_km/1000),
+    #LIFE =  sum(biodiversity),
+    #carbon = sum(carbon),
+    #opp_cost = sum(opp_cost)
+    )%>%
+  mutate(
+    proportion = round(area_top30_1000km2/total_top30_area_C,4),
+    priority= "cost"
+    )
+
+# combine all, slice only top 30 countries and make a long format ordered by
+# country area and B, C OC!
+
+top_30_country_combined <- rbind(total_bio_country,total_carbon_country,total_costs_country)
+
+# select only the top 30 countries and order it by country and b, C, oc
+
+# prepare top 30 countries to export. It needs to be always the same!!
+
+countries_30 <- tot_restor_country%>%
+  arrange(desc(country_restorable_area_1000km)) %>%
+  slice(1:30) %>%
+  pull(country_name)
+
+top_30_country_combined_ordered <- top_30_country_combined %>%
+  mutate(
+    country_name = factor(country_name, levels = countries_30),
+    area_top30_1000km2 = round(area_top30_1000km2,4)
+  ) %>%
+  arrange(country_name)%>%
+  filter(!is.na(country_name))
+
+write.csv(top_30_country_combined_ordered,"output_tables/top_30_b_c_oc_proportions.csv")
+
 
 #---- generate tables for proportion of the areas with high nat. regen. pot ----
 
@@ -424,12 +504,7 @@ combined <- bind_rows(bio_sum, C_sum, oc_sum) %>%
 
 write.csv(combined,"output_tables/high_nr_overlap_top_areas.csv",row.names = F)
 
-# prepare top 30 countries to export. It needs to be always the same!!
 
-countries_30 <- tot_restor_country%>%
-  arrange(desc(country_restorable_area_1000km)) %>%
-  slice(1:31) %>%
-  pull(country_name)
 
 # for biodiversity
 
@@ -453,17 +528,60 @@ top30_high_bio_combined_30countries_ordered <- top30_high_bio_combined_30countri
 top30_high_C_combined_30countries <- top30_high_C_combined %>%
   filter(country_name %in% countries_30)
 
+
+length(unique(top30_high_C_combined_30countries$country_name)) # 30!!
+
 # some country does not appear here?? how!! not sure but need to continue from here!!
 
+
+# 1) Get the ordering from threshold == 0.5
+levs <- top30_high_C_combined_30countries %>%
+  filter(threshold == 0.5) %>%
+  arrange(desc(prop_high)) %>%
+  pull(country_name)
+
+# Optional: if some countries don't have 0.5 rows, append them at the end
+missing_levs <- setdiff(unique(top30_high_C_combined_30countries$country_name), levs)
+levs <- c(levs, sort(missing_levs))  # keep determinism
+
+
+# 2) Apply the ordering and sort within-country by threshold
 top30_high_C_combined_30countries_ordered <- top30_high_C_combined_30countries %>%
-  group_by(country_name) %>%
   mutate(
-    # get the prop_high value at threshold == 0.5 for each country
-    prop_ref = prop_high[threshold == 0.5][1]
+    country_name = factor(country_name, levels = levs),
+    threshold = factor(threshold, levels = c(0.4, 0.5, 0.6), ordered = TRUE)
   ) %>%
-  ungroup() %>%
-  # reorder countries by that reference value
-  mutate(country_name = fct_reorder(country_name, prop_ref, .desc = TRUE)) %>%
-  arrange(country_name, threshold)   # optional: ensures 0.4, 0.5, 0.6 order
+  arrange(country_name, threshold)
+
+
+# for oc
+
+top30_high_oc_combined_30countries <- top30_high_oc_combined %>%
+  filter(country_name %in% countries_30)
+
+
+
+# 1) Get the ordering from threshold == 0.5
+levs <- top30_high_oc_combined_30countries %>%
+  filter(threshold == 0.5) %>%
+  arrange(desc(prop_high)) %>%
+  pull(country_name)
+
+# Optional: if some countries don't have 0.5 rows, append them at the end
+missing_levs <- setdiff(unique(top30_high_oc_combined_30countries$country_name), levs)
+levs <- c(levs, sort(missing_levs))  # keep determinism
+
+
+# 2) Apply the ordering and sort within-country by threshold
+top30_high_oc_combined_30countries_ordered <- top30_high_oc_combined_30countries %>%
+  mutate(
+    country_name = factor(country_name, levels = levs),
+    threshold = factor(threshold, levels = c(0.4, 0.5, 0.6), ordered = TRUE)
+  ) %>%
+  arrange(country_name, threshold)
 
 write.csv(top30_high_bio_combined_30countries_ordered,"output_tables/top30_countries_biodiversity.csv",row.names = F)
+
+write.csv(top30_high_C_combined_30countries_ordered,"output_tables/top30_countries_C.csv",row.names = F)
+
+write.csv(top30_high_oc_combined_30countries_ordered,"output_tables/top30_countries_oc.csv",row.names = F)
